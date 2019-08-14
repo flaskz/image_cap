@@ -3,7 +3,7 @@
 
 # from __future__ import absolute_import, division, print_function, unicode_literals
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -36,14 +36,28 @@ vgg = False
 #
 # num_batches = 10
 #
-# num_examples = int(num_batches * BATCH_SIZE / (1-TEST_SIZE))
-# num_examples = 1345
 # EPOCHS = 15
 #
 # annotation_file = 'E:\\User\\freelancer\\image_captioning\\annotations\\captions_train2014.json'
 # PATH = 'E:\\User\\freelancer\\image_captioning\\train2014\\'
 #
 # checkpoint_path = ".\\checkpoints\\incept3"
+
+num_examples = int(num_batches * BATCH_SIZE / (1-TEST_SIZE))
+
+
+def download_coco_train2014():
+    annotation_zip = tf.keras.utils.get_file('captions.zip',
+                                             cache_subdir=os.path.abspath('.'),
+                                             origin='http://images.cocodataset.org/annotations/annotations_trainval2014.zip',
+                                             extract=True)
+    name_of_zip = 'train2014.zip'
+    if not os.path.exists(os.path.abspath('.') + '/' + name_of_zip):
+        image_zip = tf.keras.utils.get_file(name_of_zip,
+                                            cache_subdir=os.path.abspath('.'),
+                                            origin='http://images.cocodataset.org/zips/train2014.zip',
+                                            extract=True)
+
 
 # Read the json file
 with open(annotation_file, 'r') as f:
@@ -430,13 +444,17 @@ def main():
     parser.add_argument('--train', type=bool, default=False)
     parser.add_argument('--image_path', type=str, default='/tmp')
     parser.add_argument('--preprocess_images', type=bool, default=False)
+    parser.add_argument('--download_coco', type=bool, default=False)
     args = parser.parse_args()
+
+    if args.download_coco:
+        download_coco_train2014()
 
     if args.preprocess_images:
         preprocess_images_for_training()
 
     if args.train:
-        do_train(".\\checkpoints\\train")
+        do_train(checkpoint_path)
     else:
         ckpt = tf.train.Checkpoint(encoder=encoder,
                                    decoder=decoder,
