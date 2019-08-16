@@ -12,7 +12,7 @@ from params import *
 
 num_examples = int(num_batches * BATCH_SIZE / (1-TEST_SIZE))
 
-def load_image(image_path, vgg=False):
+def load_image(image_path):
     print('load image: ', image_path)
     img = tf.io.read_file(image_path)
     img = tf.image.decode_jpeg(img, channels=3)
@@ -57,18 +57,18 @@ def main(annotation_file, vgg, PATH, num_examples):
 
     train_captions = train_captions[:num_examples]
     img_name_vector = img_name_vector[:num_examples]
-
-    import os
-    names = [os.path.split(x)[-1] for x in img_name_vector]
-    np_files = [x.split('.npy')[0] for x in os.listdir('train2014') if x.endswith('npy')]
-    len(set(names))
-    n_tem = []
-    i = 0
-    for x in names:
-        print(len(names)-i)
-        i += 1
-        if x not in np_files:
-            n_tem.append(x)
+    #
+    # import os
+    # names = [os.path.split(x)[-1] for x in img_name_vector]
+    # np_files = [x.split('.npy')[0] for x in os.listdir('train2014') if x.endswith('npy')]
+    # len(set(names))
+    # n_tem = []
+    # i = 0
+    # for x in names:
+    #     print(len(names)-i)
+    #     i += 1
+    #     if x not in np_files:
+    #         n_tem.append(x)
     # img_name_vector = [os.path.join(PATH, x) for x in os.listdir(PATH) if x.endswith('.jpg')]
     # print(PATH)
     # print(img_name_vector)
@@ -94,7 +94,7 @@ def main(annotation_file, vgg, PATH, num_examples):
 
     # Feel free to change batch_size according to your system configuration
     image_dataset = tf.data.Dataset.from_tensor_slices(encode_train)
-    image_dataset = image_dataset.map(lambda x: load_image(x, vgg), num_parallel_calls=tf.data.experimental.AUTOTUNE).batch(16)
+    image_dataset = image_dataset.map(lambda x: load_image(x), num_parallel_calls=tf.data.experimental.AUTOTUNE).batch(8)
 
     n_processed_imgs = 0
     for img, path in image_dataset:
@@ -105,7 +105,7 @@ def main(annotation_file, vgg, PATH, num_examples):
       for bf, p in zip(batch_features, path):
         path_of_feature = p.numpy().decode("utf-8")
         np.save(path_of_feature, bf.numpy())
-        print(n_processed_imgs, path)
+        print(n_processed_imgs)
         n_processed_imgs += 1
 
 
