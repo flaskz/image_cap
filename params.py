@@ -29,13 +29,14 @@ flickr_dev = 'E:\\User\\freelancer\\image_cap\\Flickr8k\\Flickr_8k.devImages.txt
 # which data to use (coco/flickr)
 if data_format == 'coco':
     # path to coco images
-    PATH = 'E:\\User\\freelancer\\image_captioning\\train2014\\'
+    PATH = 'E:\\User\\freelancer\\datasets\\train2014\\'
 else:
     # path to flickr images
-    PATH = 'E:\\User\\freelancer\\image_cap\\Flickr8k\\Flicker8k_Dataset\\'
+    PATH = 'E:\\User\\freelancer\\datasets\\Flicker8k_Dataset\\'
 
 # directory to save checkpoint
 checkpoint_save_path = ".\\checkpoints\\train"
+os.makedirs(checkpoint_save_path, exist_ok=True)
 
 
 ################################## VALIDATION ##################################
