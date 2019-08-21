@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+# from __future__ import absolute_import, division, print_function, unicode_literals
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import os
 import tensorflow as tf
@@ -10,13 +12,15 @@ import numpy as np
 import json
 from params import *
 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 num_examples = int(num_batches * BATCH_SIZE / (1-TEST_SIZE))
 
+
 def load_image(image_path):
-    print('load image: ', image_path)
+    # print('load image: ', image_path)
     img = tf.io.read_file(image_path)
     img = tf.image.decode_jpeg(img, channels=3)
-    print('loaded image: ', img.shape)
+    # print('loaded image: ', img.shape)
     if vgg:
         print('vgg')
         img = tf.image.resize(img, (224, 224))
@@ -25,16 +29,15 @@ def load_image(image_path):
         print('inception')
         img = tf.image.resize(img, (299, 299))
         new_img = tf.keras.applications.inception_v3.preprocess_input(img)
-    print('processed: ', new_img.shape, img.shape)
+    # print('processed: ', new_img.shape, img.shape)
 
     return new_img, image_path
 
 
-def main(annotation_file, vgg, PATH, num_examples):
+def preprocess_coco():
     with open(annotation_file, 'r') as f:
         annotations = json.load(f)
 
-    # Store captions and image names in vectors
     all_captions = []
     all_img_name_vector = []
 
@@ -46,14 +49,11 @@ def main(annotation_file, vgg, PATH, num_examples):
         all_img_name_vector.append(full_coco_image_path)
         all_captions.append(caption)
 
-    # Shuffle captions and image_names together
-    # Set a random state
+
     train_captions, img_name_vector = shuffle(all_captions,
                                               all_img_name_vector,
                                               random_state=1)
 
-    # Select the first 30000 captions from the shuffled set
-    # num_examples = 30000
 
     train_captions = train_captions[:num_examples]
     img_name_vector = img_name_vector[:num_examples]
@@ -72,7 +72,20 @@ def main(annotation_file, vgg, PATH, num_examples):
     # img_name_vector = [os.path.join(PATH, x) for x in os.listdir(PATH) if x.endswith('.jpg')]
     # print(PATH)
     # print(img_name_vector)
+    return img_name_vector
 
+def preprocess_flickr():
+    all_names = []
+    with open(flickr_training, 'rt') as f:
+        [all_names.append(os.path.join(PATH, x.strip())) for x in f.readlines()]
+    with open(flickr_dev, 'rt') as f:
+        [all_names.append(os.path.join(PATH, x.strip())) for x in f.readlines()]
+    with open(flickr_test, 'rt') as f:
+        [all_names.append(os.path.join(PATH, x.strip())) for x in f.readlines()]
+    return all_names
+
+
+def process_images(img_name_vector):
     if vgg:
         print('Using vgg.')
         image_model = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
@@ -97,6 +110,7 @@ def main(annotation_file, vgg, PATH, num_examples):
     image_dataset = image_dataset.map(lambda x: load_image(x), num_parallel_calls=tf.data.experimental.AUTOTUNE).batch(8)
 
     n_processed_imgs = 0
+    total = len(encode_train)
     for img, path in image_dataset:
       batch_features = image_features_extract_model(img)
       batch_features = tf.reshape(batch_features,
@@ -105,8 +119,22 @@ def main(annotation_file, vgg, PATH, num_examples):
       for bf, p in zip(batch_features, path):
         path_of_feature = p.numpy().decode("utf-8")
         np.save(path_of_feature, bf.numpy())
-        print(n_processed_imgs)
+        print('Remains: ', total - n_processed_imgs)
         n_processed_imgs += 1
+
+
+def main():
+    if data_format == 'coco':
+        img_name_vector = preprocess_coco()
+    elif data_format == 'flickr':
+        img_name_vector = preprocess_flickr()
+    else:
+        print('Invalid data format.')
+        import sys
+        sys.exit(-1)
+
+    process_images(img_name_vector)
+    print('Finished processing images.')
 
 
 
@@ -119,5 +147,5 @@ if __name__ == '__main__':
     # parser.add_argument('--num_examples', type=int, default=64)
     # args = parser.parse_args()
 
-    main(annotation_file, vgg, PATH, num_examples)
+    main()
 

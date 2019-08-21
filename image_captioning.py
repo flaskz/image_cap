@@ -43,6 +43,11 @@ vgg = False
 #
 # checkpoint_path = ".\\checkpoints\\incept3"
 
+flickr_images_path = os.path.abspath('E:\\User\\freelancer\\image_cap\\Flickr8k\\Flicker8k_Dataset')
+flickr_annot_path = os.path.abspath('E:\\User\\freelancer\\image_cap\\Flickr8k\\Flickr8k.token.txt')
+
+
+coco_dataset = True
 num_examples = int(num_batches * BATCH_SIZE / (1-TEST_SIZE))
 
 
@@ -59,21 +64,26 @@ def download_coco_train2014():
                                             extract=True)
 
 
-# Read the json file
-with open(annotation_file, 'r') as f:
-    annotations = json.load(f)
+
 
 # Store captions and image names in vectors
 all_captions = []
 all_img_name_vector = []
 
-for annot in annotations['annotations']:
-    caption = '<start> ' + annot['caption'] + ' <end>'
-    image_id = annot['image_id']
-    full_coco_image_path = PATH + 'COCO_train2014_' + '%012d.jpg' % (image_id)
+if coco_dataset:
+    # Read the json file
+    with open(annotation_file, 'r') as f:
+        annotations = json.load(f)
+    for annot in annotations['annotations']:
+        caption = '<start> ' + annot['caption'] + ' <end>'
+        image_id = annot['image_id']
+        full_coco_image_path = PATH + 'COCO_train2014_' + '%012d.jpg' % (image_id)
 
-    all_img_name_vector.append(full_coco_image_path)
-    all_captions.append(caption)
+        all_img_name_vector.append(full_coco_image_path)
+        all_captions.append(caption)
+# else:
+
+
 
 # Shuffle captions and image_names together
 # Set a random state
@@ -441,7 +451,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--train', type=bool, default=False)
+    parser.add_argument('--train', type=bool, default=True)
     parser.add_argument('--image_path', type=str, default='/tmp')
     parser.add_argument('--preprocess_images', type=bool, default=False)
     parser.add_argument('--download_coco', type=bool, default=False)
@@ -470,6 +480,7 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
 
 

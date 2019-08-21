@@ -31,41 +31,62 @@ from dl_classes import *
 num_examples = int(num_batches * BATCH_SIZE / (1-TEST_SIZE))
 loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 
-def create_data_vecs():
+def create_data_coco():
     all_captions = []
     all_img_name_vector = []
-    if data_format == 'coco':
-        with open(annotation_file, 'r') as f:
-            annotations = json.load(f)
-        for annot in annotations['annotations']:
-            caption = '<start> ' + annot['caption'] + ' <end>'
-            image_id = annot['image_id']
-            full_coco_image_path = PATH + 'COCO_train2014_' + '%012d.jpg' % (image_id)
 
-            all_img_name_vector.append(full_coco_image_path)
-            all_captions.append(caption)
-    elif data_format == 'flickr':
-        images_dict = {}
-        with open(flickr_captions, 'rt') as f:
-            for line in f.readlines():
-                line = line.strip()
-                img_name, img_cap = line.split('\t')
-                img_name = img_name[:-2]
-                if img_name not in images_dict.keys():
-                    images_dict[img_name] = []
-                images_dict[img_name].append(img_cap)
+    with open(annotation_file, 'r') as f:
+        annotations = json.load(f)
+    for annot in annotations['annotations']:
+        caption = '<start> ' + annot['caption'] + ' <end>'
+        image_id = annot['image_id']
+        full_coco_image_path = PATH + 'COCO_train2014_' + '%012d.jpg' % (image_id)
 
-        for img_name, img_caps in images_dict.items():
-            caption = '<start> ' + img_caps[0] + ' <end>'
-            full_flickr_image_path = os.path.join(PATH, img_name)
-
-            all_img_name_vector.append(full_flickr_image_path)
-            all_captions.append(caption)
-    else:
-        print('Formato invalido.')
-        sys.exit(-1)
+        all_img_name_vector.append(full_coco_image_path)
+        all_captions.append(caption)
 
     return all_img_name_vector, all_captions
+
+
+def generate_flickr_dataset():
+    images_dict = {}
+    with open(flickr_captions, 'rt') as f:
+        for line in f.readlines():
+            line = line.strip()
+            img_name, img_cap = line.split('\t')
+            img_name = img_name.split('.jpg')[0] + '.jpg'
+            if img_name not in images_dict.keys():
+                images_dict[img_name] = []
+            images_dict[img_name].append(img_cap)
+
+    with open(flickr_training, 'rt') as f:
+        train_images = [os.path.join(PATH, x.strip()) for x in f.readlines()]
+    with open(flickr_test, 'rt') as f:
+        test_images = [os.path.join(PATH, x.strip()) for x in f.readlines()]
+
+    train_size = len(train_images)
+
+    train_captions = []
+    for lst_imgs in [train_images, test_images]:
+        for img in lst_imgs:
+            train_captions.append('<start> ' + images_dict[os.path.split(img)[-1]][0].strip() + ' <end>')
+
+    tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=5000,
+                                                      oov_token="<unk>",
+                                                      filters='!"#$%&()*+.,-/:;=?@[\\]^_`{|}~ ')
+
+    tokenizer.fit_on_texts(train_captions)
+    train_seqs = tokenizer.texts_to_sequences(train_captions)
+
+    tokenizer.word_index['<pad>'] = 0
+    tokenizer.index_word[0] = '<pad>'
+
+    cap_vector = tf.keras.preprocessing.sequence.pad_sequences(train_seqs, padding='post')
+
+    max_length = calc_max_length(train_seqs)
+
+    return train_images, test_images, cap_vector[:train_size], cap_vector[train_size:], max_length, tokenizer
+
 
 
 def shuffle_data(all_img_name_vector, all_captions, rs=1):
@@ -86,7 +107,7 @@ def calc_max_length(tensor):
 def create_training_data(img_name_vector, train_captions, top_k=5000, rs=0):
     tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=top_k,
                                                       oov_token="<unk>",
-                                                      filters='!"#$%&()*+.,-/:;=?@[\]^_`{|}~ ')
+                                                      filters='!"#$%&()*+.,-/:;=?@[\\]^_`{|}~ ')
 
     tokenizer.fit_on_texts(train_captions)
     train_seqs = tokenizer.texts_to_sequences(train_captions)
@@ -189,7 +210,6 @@ def create_architecture(img_name_train, cap_train, tokenizer):
 
 def start_training(dataset, encoder, decoder, optimizer, tokenizer, num_steps, checkpoint_path=".\\checkpoints\\incept3"):
     loss_plot = []
-    print('Starting training.')
     ckpt = tf.train.Checkpoint(encoder=encoder,
                                decoder=decoder,
                                optimizer=optimizer)
@@ -229,12 +249,22 @@ def start_training(dataset, encoder, decoder, optimizer, tokenizer, num_steps, c
 
 
 def main():
-    print('Reading data.')
-    all_imgs, all_caps = create_data_vecs()
-    print('Shuffling data.')
-    imgs_path, imgs_caps = shuffle_data(all_imgs, all_caps)
-    print('Creating dataset.')
-    img_name_train, img_name_val, cap_train, cap_val, max_length, tokenizer = create_training_data(imgs_path, imgs_caps)
+    if data_format == 'coco':
+        print('Working with coco data.')
+        print('Reading data.')
+        all_imgs, all_caps = create_data_coco()
+        print('Shuffling data.')
+        imgs_path, imgs_caps = shuffle_data(all_imgs, all_caps)
+        print('Creating dataset.')
+        img_name_train, img_name_val, cap_train, cap_val, max_length, tokenizer = create_training_data(imgs_path,
+                                                                                                       imgs_caps)
+    elif data_format == 'flickr':
+        print('Working with flickr data.')
+        print('Generating dataset.')
+        img_name_train, img_name_val, cap_train, cap_val, max_length, tokenizer = generate_flickr_dataset()
+    else:
+        print('Works only with flickr or coco data.')
+        sys.exit(-1)
     print('X_train, y_train, X_test, y_test: ', len(img_name_train), len(cap_train), len(img_name_val), len(cap_val))
     print('Creating architecture.')
     dataset, encoder, decoder, optimizer, num_steps = create_architecture(img_name_train, cap_train, tokenizer)
