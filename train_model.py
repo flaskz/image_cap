@@ -129,7 +129,10 @@ def create_training_data(img_name_vector, train_captions, top_k=5000, rs=0):
 
 
 def map_func(img_name, cap):
-    img_tensor = np.load(img_name.decode('utf-8') + '.npy')
+    # print('img name:', img_name)
+    load_path = os.path.join(save_features_path, os.path.split(img_name.decode('utf-8') + '.npy')[-1])
+    # print('load path:', load_path)
+    img_tensor = np.load(load_path)
     return img_tensor, cap
 
 
@@ -172,14 +175,22 @@ def train_step(img_tensor, target, encoder, decoder, tokenizer, optimizer):
 def create_architecture(img_name_train, cap_train, tokenizer):
     if vgg:
         print('Using vgg.')
-        image_model = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
+        # image_model = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
+        image_model = tf.keras.applications.vgg16.VGG16(include_top=True, weights='imagenet', input_shape=(224, 224, 3))
     else:
         print('Using Inception V3.')
-        image_model = tf.keras.applications.InceptionV3(include_top=False, weights='imagenet', input_shape=(299, 299, 3))
+        # image_model = tf.keras.applications.InceptionV3(include_top=False, weights='imagenet', input_shape=(299, 299, 3))
+        image_model = tf.keras.applications.InceptionV3(include_top=True, weights='imagenet', input_shape=(299, 299, 3))
+
+
+    # image_model.summary()
 
     new_input = image_model.input
-    hidden_layer = image_model.layers[-1].output
-    num_feats = int(np.multiply(*hidden_layer.shape[1:3]))
+    # hidden_layer = image_model.layers[-1].output
+    # num_feats = int(np.multiply(*hidden_layer.shape[1:3]))
+
+    hidden_layer = image_model.layers[-2].output
+    num_feats = 64
 
     BUFFER_SIZE = 1000
     embedding_dim = 256

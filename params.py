@@ -1,7 +1,9 @@
 import os
 
+# using softmax layer, the same from neuraltalk
+
 # coco data only
-num_batches = 2
+num_batches = 20
 
 # parameters for training
 TEST_SIZE = 0.2
@@ -14,6 +16,10 @@ vgg = True
 
 # which dataset to use (coco/flickr)
 data_format = 'flickr'
+
+# path for saved features
+save_features_path = './features/{}/{}/'.format(data_format, 'vgg' if vgg else 'inception')
+os.makedirs(save_features_path, exist_ok=True)
 
 # path to coco train annotation file
 annotation_file = 'E:\\User\\freelancer\\image_captioning\\annotations\\captions_train2014.json'
@@ -32,10 +38,10 @@ if data_format == 'coco':
     PATH = 'E:\\User\\freelancer\\datasets\\train2014\\'
 else:
     # path to flickr images
-    PATH = 'E:\\User\\freelancer\\datasets\\Flicker8k_Dataset\\'
+    PATH = 'E:\\User\\freelancer\\datasets\\Flickr8k\\'
 
 # directory to save checkpoint
-checkpoint_save_path = ".\\checkpoints\\train"
+checkpoint_save_path = ".\\checkpoints\\test_train"
 os.makedirs(checkpoint_save_path, exist_ok=True)
 
 
