@@ -5,6 +5,7 @@
 import sys
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+# os.environ["CUDA_VISIBLE_DEVICES"] = '-1'
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -27,6 +28,7 @@ from PIL import Image
 
 from params import *
 from dl_classes import *
+from utils import create_flickr_dict
 
 num_examples = int(num_batches * BATCH_SIZE / (1-TEST_SIZE))
 loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
@@ -49,15 +51,7 @@ def create_data_coco():
 
 
 def generate_flickr_dataset():
-    images_dict = {}
-    with open(flickr_captions, 'rt') as f:
-        for line in f.readlines():
-            line = line.strip()
-            img_name, img_cap = line.split('\t')
-            img_name = img_name.split('.jpg')[0] + '.jpg'
-            if img_name not in images_dict.keys():
-                images_dict[img_name] = []
-            images_dict[img_name].append(img_cap)
+    images_dict = create_flickr_dict(flickr_captions)
 
     with open(flickr_training, 'rt') as f:
         train_images = [os.path.join(PATH, x.strip()) for x in f.readlines()]
@@ -85,7 +79,8 @@ def generate_flickr_dataset():
 
     max_length = calc_max_length(train_seqs)
 
-    return train_images, test_images, cap_vector[:train_size], cap_vector[train_size:], max_length, tokenizer
+    # return train_images, test_images, cap_vector[:train_size], cap_vector[train_size:], max_length, tokenizer
+    return train_images[:16], test_images[:4], cap_vector[:16], cap_vector[16:20], max_length, tokenizer
 
 
 
@@ -150,13 +145,16 @@ def loss_function(real, pred):
 def train_step(img_tensor, target, encoder, decoder, tokenizer, optimizer):
     loss = 0
     hidden = decoder.reset_state(batch_size=target.shape[0])
+    print('tensor shape:', img_tensor.shape)
 
     dec_input = tf.expand_dims([tokenizer.word_index['<start>']] * BATCH_SIZE, 1)
 
     with tf.GradientTape() as tape:
         features = encoder(img_tensor)
+        print('feats shape: ', features.shape)
 
         for i in range(1, target.shape[1]):
+            # print('features shape,', features.shape)
             predictions, hidden, _ = decoder(dec_input, features, hidden)
             loss += loss_function(target[:, i], predictions)
             dec_input = tf.expand_dims(target[:, i], 1)
@@ -210,6 +208,7 @@ def create_architecture(img_name_train, cap_train, tokenizer):
 
     dataset = dataset.shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
     dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    # dataset = dataset.prefetch(buffer_size=1)
 
     encoder = CNN_Encoder(embedding_dim)
     decoder = RNN_Decoder(embedding_dim, units, vocab_size)
@@ -245,7 +244,8 @@ def start_training(dataset, encoder, decoder, optimizer, tokenizer, num_steps, c
         # storing the epoch end loss value to plot later
         loss_plot.append(total_loss / num_steps)
 
-        if (epoch+1) % 5 == 0:
+        if (epoch+1) % 2 == 0:
+          print('Saving checkpoint.')
           ckpt_manager.save()
 
         print('Epoch {} Loss {:.6f}'.format(epoch + 1,

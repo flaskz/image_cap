@@ -2,7 +2,7 @@ import os
 import numpy as np
 import json
 from params import *
-
+from utils import create_flickr_dict
 
 def get_data_npy():
     all_npy = [x for x in os.listdir(save_features_path) if x.endswith('.npy')]
@@ -35,16 +35,7 @@ def get_data_npy():
 
 
 def create_flickr_json(imgs_id):
-    images_dict = {}
-    with open(flickr_captions, 'rt') as f:
-        for line in f.readlines():
-            line = line.strip()
-            img_name, img_cap = line.split('\t')
-            img_name = img_name.split('.jpg')[0] + '.jpg'
-            if img_name not in images_dict.keys():
-                images_dict[img_name] = []
-            images_dict[img_name].append(img_cap)
-
+    images_dict = create_flickr_dict(flickr_captions)
     new_json = {}
     new_json['annotations'] = []
     for k, captions in images_dict.items():
