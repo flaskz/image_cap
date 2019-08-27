@@ -18,6 +18,7 @@ import matplotlib.image as mpimg
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 
+import pickle
 import re
 import numpy as np
 import time
@@ -79,8 +80,8 @@ def generate_flickr_dataset():
 
     max_length = calc_max_length(train_seqs)
 
-    # return train_images, test_images, cap_vector[:train_size], cap_vector[train_size:], max_length, tokenizer
-    return train_images[:16], test_images[:4], cap_vector[:16], cap_vector[16:20], max_length, tokenizer
+    return train_images, test_images, cap_vector[:train_size], cap_vector[train_size:], max_length, tokenizer
+    # return train_images[:16], test_images[:4], cap_vector[:16], cap_vector[16:20], max_length, tokenizer
 
 
 
@@ -244,13 +245,16 @@ def start_training(dataset, encoder, decoder, optimizer, tokenizer, num_steps, c
         # storing the epoch end loss value to plot later
         loss_plot.append(total_loss / num_steps)
 
-        if (epoch+1) % 2 == 0:
+        if (epoch+1) % 5 == 0:
           print('Saving checkpoint.')
           ckpt_manager.save()
 
         print('Epoch {} Loss {:.6f}'.format(epoch + 1,
                                              total_loss/num_steps))
         print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
+
+    print('Saving checkpoint.')
+    ckpt_manager.save()
 
     plt.plot(loss_plot)
     plt.xlabel('Epochs')
@@ -276,6 +280,10 @@ def main():
     else:
         print('Works only with flickr or coco data.')
         sys.exit(-1)
+
+    with open(os.path.join(checkpoint_save_path, 'tokenizer.pickle'), 'wb') as handle:
+        pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
     print('X_train, y_train, X_test, y_test: ', len(img_name_train), len(cap_train), len(img_name_val), len(cap_val))
     print('Creating architecture.')
     dataset, encoder, decoder, optimizer, num_steps = create_architecture(img_name_train, cap_train, tokenizer)
@@ -288,6 +296,12 @@ def main():
                    num_steps=num_steps,
                    checkpoint_path=checkpoint_save_path)
     print('Finished training.')
+    # print('Saving model.')
+    #
+    # encoder.save(os.path.join(checkpoint_save_path, 'encoder.h5'))
+    # decoder.save(os.path.join(checkpoint_save_path, 'decoder.h5'))
+    #
+    # print('Models saved.')
 
 
 if __name__ == '__main__':
