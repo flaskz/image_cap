@@ -16,6 +16,7 @@ import matplotlib.image as mpimg
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 
+import sys
 import pickle
 import re
 import numpy as np
@@ -135,21 +136,23 @@ ckpt_manager = tf.train.CheckpointManager(ckpt, checkpoint_load_path, max_to_kee
 ckpt.restore(ckpt_manager.latest_checkpoint)
 print('loaded from checkpoint: ', checkpoint_load_path)
 
+image_path = os.path.abspath(single_image_val)
+result = evaluate(image_path)
+print('Prediction Caption:', ' '.join(result))
 
-# image_path = os.path.abspath(single_image_val)
-# result = evaluate(image_path)
-# print('Prediction Caption:', ' '.join(result))
-
-from params import flickr_dev, PATH
-import os
-with open(flickr_dev, 'rt') as f:
-    imgs = [os.path.join(PATH, x.strip()) for x in f.readlines()]
-
-total = len(imgs)
-imgs_caps = {}
-for img in imgs:
-    imgs_caps[os.path.split(img)[-1]] = evaluate(img)
-    print('Todo: ', total-len(imgs_caps))
-
-create_flickr_val_json(imgs_caps)
+# if data_format == 'flickr':
+#     with open(flickr_dev, 'rt') as f:
+#         imgs = [os.path.join(PATH, x.strip()) for x in f.readlines()]
+#
+#     total = len(imgs)
+#     imgs_caps = {}
+#     for img in imgs:
+#         imgs_caps[os.path.split(img)[-1]] = evaluate(img)
+#         print('Todo: ', total-len(imgs_caps))
+#     create_flickr_val_json(imgs_caps)
+# elif data_format == 'coco':
+#
+# else:
+#     print('Not a valid format.')
+#     sys.exit(-1)
 
