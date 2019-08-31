@@ -26,13 +26,13 @@ from glob import glob
 from PIL import Image
 
 
-from utils import create_flickr_dict
+# from utils import create_flickr_dict
 from params import *
 from dl_classes import *
 
 num_examples = int(num_batches * BATCH_SIZE / (1-TEST_SIZE))
 
-def create_flickr_val_json(imgs_caps):
+def create_val_json(imgs_caps, file_name):
     val_json = []
     for img, cap in imgs_caps.items():
         try:
@@ -47,7 +47,7 @@ def create_flickr_val_json(imgs_caps):
             print(e)
             continue
 
-    with open(os.path.join(checkpoint_load_path, 'flickr_captions_val.json'), 'wt') as f:
+    with open(os.path.join(checkpoint_load_path, file_name), 'wt') as f:
         json.dump(val_json, f)
 
 
@@ -73,7 +73,9 @@ def evaluate(image):
     hidden = decoder.reset_state(batch_size=1)
     temp_input = tf.expand_dims(load_image(image)[0], 0)
     img_tensor_val = image_features_extract_model(temp_input)
-    # print('img shape: ', img_tensor_val.shape)
+
+    img_tensor_val = tf.reshape(img_tensor_val, (img_tensor_val.shape[0], -1, img_tensor_val.shape[-1]))
+    print('img shape: ', img_tensor_val.shape)
 
     # print('here?')
     features = encoder(img_tensor_val)
@@ -89,10 +91,15 @@ def evaluate(image):
         result.append(tokenizer.index_word[predicted_id])
 
         if tokenizer.index_word[predicted_id] == '<end>':
-            return result
+            to_return = ' '.join(result)
+            print(to_return)
+            return to_return
 
         dec_input = tf.expand_dims([predicted_id], 0)
-    print(result)
+
+    # to_return = ' '.join(result)
+    # print(to_return)
+    # return to_return
     return result
 
 
@@ -102,13 +109,16 @@ max_length = 64
 
 if vgg:
     print('Using vgg.')
-    image_model = tf.keras.applications.vgg16.VGG16(include_top=True, weights='imagenet', input_shape=(224, 224, 3))
+    # image_model = tf.keras.applications.vgg16.VGG16(include_top=True, weights='imagenet', input_shape=(224, 224, 3))
+    image_model = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
 else:
     print('Using Inception V3.')
-    image_model = tf.keras.applications.InceptionV3(include_top=True, weights='imagenet', input_shape=(299, 299, 3))
+    # image_model = tf.keras.applications.InceptionV3(include_top=True, weights='imagenet', input_shape=(299, 299, 3))
+    image_model = tf.keras.applications.InceptionV3(include_top=False, weights='imagenet', input_shape=(299, 299, 3))
 
 new_input = image_model.input
-hidden_layer = image_model.layers[-2].output
+# hidden_layer = image_model.layers[-2].output
+hidden_layer = image_model.layers[-1].output
 num_feats = 64
 
 image_features_extract_model = tf.keras.Model(new_input, hidden_layer)
@@ -136,23 +146,30 @@ ckpt_manager = tf.train.CheckpointManager(ckpt, checkpoint_load_path, max_to_kee
 ckpt.restore(ckpt_manager.latest_checkpoint)
 print('loaded from checkpoint: ', checkpoint_load_path)
 
-image_path = os.path.abspath(single_image_val)
-result = evaluate(image_path)
-print('Prediction Caption:', ' '.join(result))
 
-# if data_format == 'flickr':
-#     with open(flickr_dev, 'rt') as f:
-#         imgs = [os.path.join(PATH, x.strip()) for x in f.readlines()]
-#
-#     total = len(imgs)
-#     imgs_caps = {}
-#     for img in imgs:
-#         imgs_caps[os.path.split(img)[-1]] = evaluate(img)
-#         print('Todo: ', total-len(imgs_caps))
-#     create_flickr_val_json(imgs_caps)
-# elif data_format == 'coco':
-#
-# else:
-#     print('Not a valid format.')
-#     sys.exit(-1)
+def do_validation(imgs):
+    total = len(imgs)
+    imgs_caps = {}
+    for img in imgs:
+        imgs_caps[os.path.split(img)[-1]] = evaluate(img)
+        print('Todo: ', total - len(imgs_caps))
+    return imgs_caps
 
+
+if validate_batch:
+    if data_format == 'flickr':
+        with open(flickr_dev, 'rt') as f:
+            imgs = [os.path.join(PATH, x.strip()) for x in f.readlines()]
+        imgs_caps = do_validation(imgs)
+        create_val_json(imgs_caps, 'flickr_captions_val.json')
+    elif data_format == 'coco':
+        imgs = [os.path.join(validation_dir, x) for x in os.listdir(validation_dir)]
+        imgs_caps = do_validation(imgs)
+        create_val_json(imgs_caps, 'coco_captions_val.json')
+    else:
+        print('Not a valid format.')
+        sys.exit(-1)
+else:
+    image_path = os.path.abspath(single_image_val)
+    result = evaluate(image_path)
+    print('Prediction Caption:', ' '.join(result))

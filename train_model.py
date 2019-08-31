@@ -29,8 +29,9 @@ from PIL import Image
 
 from params import *
 from dl_classes import *
-from utils import create_flickr_dict
+from utils import create_flickr_dict, load_weights
 
+word_weight = load_weights('./tag2score_list_2.json')
 num_examples = int(num_batches * BATCH_SIZE / (1-TEST_SIZE))
 loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 
@@ -84,14 +85,13 @@ def generate_flickr_dataset():
     # return train_images[:16], test_images[:4], cap_vector[:16], cap_vector[16:20], max_length, tokenizer
 
 
-
 def shuffle_data(all_img_name_vector, all_captions, rs=1):
     train_captions, img_name_vector = shuffle(all_captions,
                                               all_img_name_vector,
                                               random_state=rs)
-
-    train_captions = train_captions[:num_examples]
-    img_name_vector = img_name_vector[:num_examples]
+    if not full_coco_dataset:
+        train_captions = train_captions[:num_examples]
+        img_name_vector = img_name_vector[:num_examples]
 
     return img_name_vector, train_captions
 
@@ -133,12 +133,17 @@ def map_func(img_name, cap):
 
 
 def loss_function(real, pred):
+    # print('real: ', real)
+    # print('pred: ', pred)
     mask = tf.math.logical_not(tf.math.equal(real, 0))
     loss_ = loss_object(real, pred)
 
     mask = tf.cast(mask, dtype=loss_.dtype)
     loss_ *= mask
 
+    # print('loss: ', loss_)
+    # print('half loss: ', loss_*tf.cast(0.5, dtype=loss_.dtype))
+    # print('reduce mean: ', tf.reduce_mean(loss_))
     return tf.reduce_mean(loss_)
 
 
@@ -157,6 +162,10 @@ def train_step(img_tensor, target, encoder, decoder, tokenizer, optimizer):
         for i in range(1, target.shape[1]):
             # print('features shape,', features.shape)
             predictions, hidden, _ = decoder(dec_input, features, hidden)
+
+            # print('pred 0:', tf.argmax(predictions[0]).numpy())
+            # predicted_id = tf.argmax(predictions[0]).numpy()
+            # print('pred word: ', tokenizer.index_word[predicted_id])
             loss += loss_function(target[:, i], predictions)
             dec_input = tf.expand_dims(target[:, i], 1)
 

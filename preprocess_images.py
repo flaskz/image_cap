@@ -56,7 +56,9 @@ def preprocess_coco():
 
 
     train_captions = train_captions[:num_examples]
-    img_name_vector = img_name_vector[:num_examples]
+    # img_name_vector = img_name_vector[:num_examples]
+
+
     #
     # import os
     # names = [os.path.split(x)[-1] for x in img_name_vector]
@@ -88,15 +90,27 @@ def preprocess_flickr():
 def process_images(img_name_vector):
     if vgg:
         print('Using vgg.')
-        # image_model = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
-        image_model = tf.keras.applications.vgg16.VGG16(include_top=True, weights='imagenet', input_shape=(224, 224, 3))
+        if generate_dict_dataset:
+            image_model = tf.keras.applications.vgg16.VGG16(include_top=True, weights='imagenet',
+                                                            input_shape=(224, 224, 3))
+        else:
+            image_model = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet',
+                                                            input_shape=(224, 224, 3))
     else:
         print('Using Inception V3.')
-        # image_model = tf.keras.applications.InceptionV3(include_top=False, weights='imagenet', input_shape=(299, 299, 3))
-        image_model = tf.keras.applications.InceptionV3(include_top=True, weights='imagenet', input_shape=(299, 299, 3))
+        if generate_dict_dataset:
+            image_model = tf.keras.applications.InceptionV3(include_top=True, weights='imagenet',
+                                                            input_shape=(299, 299, 3))
+        else:
+            image_model = tf.keras.applications.InceptionV3(include_top=False, weights='imagenet',
+                                                            input_shape=(299, 299, 3))
 
     new_input = image_model.input
-    hidden_layer = image_model.layers[-2].output
+
+    if generate_dict_dataset:
+        hidden_layer = image_model.layers[-2].output
+    else:
+        hidden_layer = image_model.layers[-1].output
     # num_feats = int(np.multiply(*hidden_layer.shape[1:3]))
 
     image_features_extract_model = tf.keras.Model(new_input, hidden_layer)
@@ -113,8 +127,8 @@ def process_images(img_name_vector):
     total = len(encode_train)
     for img, path in image_dataset:
       batch_features = image_features_extract_model(img)
-      # batch_features = tf.reshape(batch_features,
-      #                             (batch_features.shape[0], -1, batch_features.shape[3]))
+      batch_features = tf.reshape(batch_features,
+                                  (batch_features.shape[0], -1, batch_features.shape[3]))
       print(batch_features.shape)
 
       for bf, p in zip(batch_features, path):
