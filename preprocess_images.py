@@ -56,7 +56,8 @@ def preprocess_coco():
 
 
     train_captions = train_captions[:num_examples]
-    # img_name_vector = img_name_vector[:num_examples]
+    if not full_coco_dataset:
+        img_name_vector = img_name_vector[:num_examples]
 
 
     #
@@ -127,8 +128,9 @@ def process_images(img_name_vector):
     total = len(encode_train)
     for img, path in image_dataset:
       batch_features = image_features_extract_model(img)
-      batch_features = tf.reshape(batch_features,
-                                  (batch_features.shape[0], -1, batch_features.shape[3]))
+      if not generate_dict_dataset:
+        batch_features = tf.reshape(batch_features,
+                                  (batch_features.shape[0], -1, batch_features.shape[-1]))
       print(batch_features.shape)
 
       for bf, p in zip(batch_features, path):

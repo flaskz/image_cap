@@ -1,24 +1,33 @@
 import os
 
 # using softmax layer, the same from neuraltalk
+# use to generate weights from dict dataset
+generate_dict_dataset = False
 
 # coco data only
-num_batches = 20
+full_coco_dataset = False
+num_batches = 700
 
 # parameters for training
 TEST_SIZE = 0.2
-BATCH_SIZE = 16
-EPOCHS = 15
+
+# batch size must be multiple of train
+BATCH_SIZE = 8
+EPOCHS = 20
 
 # cnn architecture (vgg/inception)
 # if vgg = False then use inception
-vgg = True
+vgg = False
 
 # which dataset to use (coco/flickr)
-data_format = 'flickr'
+data_format = 'coco'
 
 # path for saved features
-save_features_path = './features/{}/{}/'.format(data_format, 'vgg' if vgg else 'inception')
+if generate_dict_dataset:
+    save_features_path = 'E:\\User\\freelancer\\features\\include_top\\{}\\{}\\'.format(data_format, 'vgg' if vgg else 'inception')
+else:
+    save_features_path = 'E:\\User\\freelancer\\features\\{}\\{}\\'.format(data_format, 'vgg' if vgg else 'inception')
+
 os.makedirs(save_features_path, exist_ok=True)
 
 # path to coco train annotation file
@@ -39,18 +48,33 @@ if data_format == 'coco':
 else:
     # path to flickr images
     PATH = 'E:\\User\\freelancer\\datasets\\Flickr8k\\'
+    # PATH = 'E:\\User\\freelancer\\datasets\\Flickr8k\\test_flickr'
 
 # directory to save checkpoint
-checkpoint_save_path = ".\\checkpoints\\test_train"
+# checkpoint_save_path = ".\\checkpoints\\test_flickr_train"
+if data_format == 'coco':
+    checkpoint_save_path = ".\\checkpoints\\test_coco_train"
+else:
+    checkpoint_save_path = ".\\checkpoints\\test_flickr_train"
+
 os.makedirs(checkpoint_save_path, exist_ok=True)
 
 
 ################################## VALIDATION ##################################
 
 # directory with the saved model for validation
-checkpoint_load_path = ".\\checkpoints\\train"
+# checkpoint_load_path = checkpoint_save_path
+if data_format == 'coco':
+    checkpoint_load_path = ".\\checkpoints\\train"
+else:
+    checkpoint_load_path = ".\\checkpoints\\test_flickr_train"
 
 # use trained model on single image
-single_image_val = os.path.join(PATH, 'COCO_train2014_000000093496.jpg')
+# single_image_val = os.path.join(PATH, 'COCO_train2014_000000093496.jpg')
+validate_batch = False
+
+# single_image_val = 'E:\\User\\freelancer\\datasets\\Flickr8k\\1579798212_d30844b4c5.jpg']
+single_image_val = 'E:\\User\\Imagem\\formacao_1600x1200-um-milhao-de-amigos.jpg'
+validation_dir = 'E:\\User\\freelancer\\datasets\\train2014'
 
 

@@ -164,8 +164,14 @@ def train_step(img_tensor, target, encoder, decoder, tokenizer, optimizer):
             predictions, hidden, _ = decoder(dec_input, features, hidden)
 
             # print('pred 0:', tf.argmax(predictions[0]).numpy())
-            # predicted_id = tf.argmax(predictions[0]).numpy()
-            # print('pred word: ', tokenizer.index_word[predicted_id])
+
+            # for new_i in range(BATCH_SIZE):
+            #     true_id = np.array(target[:, i])
+            #     # print('true word: ', tokenizer.index_word[true_id])
+            #     print('true word: ', tokenizer.index_word[true_id[new_i]])
+            #     predicted_id = tf.argmax(predictions[new_i]).numpy()
+            #     print('pred word: ', tokenizer.index_word[predicted_id])
+
             loss += loss_function(target[:, i], predictions)
             dec_input = tf.expand_dims(target[:, i], 1)
 

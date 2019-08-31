@@ -91,9 +91,10 @@ def evaluate(image):
         result.append(tokenizer.index_word[predicted_id])
 
         if tokenizer.index_word[predicted_id] == '<end>':
-            to_return = ' '.join(result)
-            print(to_return)
-            return to_return
+            # to_return = ' '.join(result)
+            # print(to_return)
+            # return to_return
+            return result
 
         dec_input = tf.expand_dims([predicted_id], 0)
 
