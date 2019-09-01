@@ -2,7 +2,7 @@ import os
 
 # using softmax layer, the same from neuraltalk
 # use to generate weights from dict dataset
-generate_dict_dataset = False
+generate_dict_dataset = True
 
 # coco data only
 full_coco_dataset = False
@@ -17,10 +17,10 @@ EPOCHS = 10
 
 # cnn architecture (vgg/inception)
 # if vgg = False then use inception
-vgg = False
+vgg = True
 
 # which dataset to use (coco/flickr)
-data_format = 'coco'
+data_format = 'flickr'
 
 # path for saved features
 if generate_dict_dataset:

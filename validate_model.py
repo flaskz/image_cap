@@ -26,7 +26,7 @@ from glob import glob
 from PIL import Image
 
 
-# from utils import create_flickr_dict
+from utils import create_flickr_dict, create_coco_dict
 from params import *
 from dl_classes import *
 
@@ -110,19 +110,21 @@ max_length = 64
 
 if vgg:
     print('Using vgg.')
-    # image_model = tf.keras.applications.vgg16.VGG16(include_top=True, weights='imagenet', input_shape=(224, 224, 3))
+    other_image_model = tf.keras.applications.vgg16.VGG16(include_top=True, weights='imagenet', input_shape=(224, 224, 3))
     image_model = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
 else:
     print('Using Inception V3.')
-    # image_model = tf.keras.applications.InceptionV3(include_top=True, weights='imagenet', input_shape=(299, 299, 3))
+    other_image_model = tf.keras.applications.InceptionV3(include_top=True, weights='imagenet', input_shape=(299, 299, 3))
     image_model = tf.keras.applications.InceptionV3(include_top=False, weights='imagenet', input_shape=(299, 299, 3))
 
 new_input = image_model.input
-# hidden_layer = image_model.layers[-2].output
+other_new_input = other_image_model.input
+other_hidden_layer = other_image_model.layers[-2].output
 hidden_layer = image_model.layers[-1].output
 num_feats = 64
 
 image_features_extract_model = tf.keras.Model(new_input, hidden_layer)
+other_image_features_extract_model = tf.keras.Model(other_new_input, other_hidden_layer)
 
 BUFFER_SIZE = 1000
 embedding_dim = 256
@@ -157,6 +159,31 @@ def do_validation(imgs):
     return imgs_caps
 
 
+def nearest_caps(image_path):
+    with open(os.path.join(save_features_path, 'knn_model.pkl'), 'rb') as f:
+        knn = pickle.load(f)
+    # with open(os.path.join(save_features_path, 'features_array.pkl'), 'wb') as f:
+    #     pickle.dump(features_array, f)
+    with open(os.path.join(save_features_path, 'imgs_id.pkl'), 'rb') as f:
+        imgs_id = pickle.load(f)
+
+    temp_input = tf.expand_dims(load_image(image_path)[0], 0)
+    img_tensor_val = other_image_features_extract_model (temp_input)
+    img_tensor_val = tf.reshape(img_tensor_val, (img_tensor_val.shape[0], -1, img_tensor_val.shape[-1]))
+    # def find_neigh_caps(knn, feature_array, imgs_id, imgs_dict, nn=5):
+    results = knn.kneighbors(X=img_tensor_val.numpy().reshape(1, -1), n_neighbors=5)
+
+    if data_format == 'coco':
+        imgs_dict = create_coco_dict(annotation_file)
+    else:
+        imgs_dict = create_flickr_dict(flickr_captions)
+
+    all_caps = []
+    for r in results[1][0]:
+        [all_caps.append(x) for x in imgs_dict[imgs_id[r]+'.jpg']]
+    return all_caps
+
+
 if validate_batch:
     if data_format == 'flickr':
         with open(flickr_dev, 'rt') as f:
@@ -174,3 +201,6 @@ else:
     image_path = os.path.abspath(single_image_val)
     result = evaluate(image_path)
     print('Prediction Caption:', ' '.join(result))
+    all_caps = nearest_caps(image_path)
+    print('All caps:', all_caps)
+

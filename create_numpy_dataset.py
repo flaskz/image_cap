@@ -6,8 +6,9 @@ from utils import create_flickr_dict
 
 def get_data_npy():
     all_npy = [x for x in os.listdir(save_features_path) if x.endswith('.npy')]
-    len(all_npy)
 
+    total = len(all_npy)
+    i = 0
     aux_dict = {}
     if data_format == 'coco':
         for npy_file in all_npy:
@@ -18,6 +19,8 @@ def get_data_npy():
                 print('Couldn\'t load file:', npy_file)
                 print('Error:', e)
                 continue
+            print(total - i)
+            i += 1
     else:
         for npy_file in all_npy:
             try:
@@ -27,6 +30,8 @@ def get_data_npy():
                 print('Couldn\'t load file:', npy_file)
                 print('Error:', e)
                 continue
+            print(total - i)
+            i += 1
 
     with open(os.path.join(save_features_path, 'all_npy_dict.npy'), 'wb') as f:
         np.save(f, aux_dict)
