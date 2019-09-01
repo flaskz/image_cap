@@ -6,14 +6,14 @@ generate_dict_dataset = False
 
 # coco data only
 full_coco_dataset = False
-num_batches = 700
+num_batches = 100
 
 # parameters for training
 TEST_SIZE = 0.2
 
 # batch size must be multiple of train
 BATCH_SIZE = 8
-EPOCHS = 20
+EPOCHS = 10
 
 # cnn architecture (vgg/inception)
 # if vgg = False then use inception
@@ -53,9 +53,9 @@ else:
 # directory to save checkpoint
 # checkpoint_save_path = ".\\checkpoints\\test_flickr_train"
 if data_format == 'coco':
-    checkpoint_save_path = ".\\checkpoints\\test_coco_train"
+    checkpoint_save_path = ".\\checkpoints\\test_coco_train_500"
 else:
-    checkpoint_save_path = ".\\checkpoints\\test_flickr_train"
+    checkpoint_save_path = ".\\checkpoints\\test_flickr_train_weights"
 
 os.makedirs(checkpoint_save_path, exist_ok=True)
 
@@ -65,16 +65,21 @@ os.makedirs(checkpoint_save_path, exist_ok=True)
 # directory with the saved model for validation
 # checkpoint_load_path = checkpoint_save_path
 if data_format == 'coco':
-    checkpoint_load_path = ".\\checkpoints\\train"
+    # checkpoint_load_path = ".\\checkpoints\\test_coco_train"
+    checkpoint_load_path = checkpoint_save_path
 else:
-    checkpoint_load_path = ".\\checkpoints\\test_flickr_train"
+    # checkpoint_load_path = ".\\checkpoints\\test_flickr_train"
+    checkpoint_load_path = checkpoint_save_path
 
 # use trained model on single image
 # single_image_val = os.path.join(PATH, 'COCO_train2014_000000093496.jpg')
 validate_batch = False
 
 # single_image_val = 'E:\\User\\freelancer\\datasets\\Flickr8k\\1579798212_d30844b4c5.jpg']
-single_image_val = 'E:\\User\\Imagem\\formacao_1600x1200-um-milhao-de-amigos.jpg'
+# single_image_val = 'E:\\User\\Imagem\\formacao_1600x1200-um-milhao-de-amigos.jpg'
+single_image_val = 'E:\\User\\Imagem\\Helping-the-elderly.jpg'
+
+
 validation_dir = 'E:\\User\\freelancer\\datasets\\train2014'
 
 

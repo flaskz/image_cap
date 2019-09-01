@@ -49,15 +49,15 @@ def preprocess_coco():
         all_img_name_vector.append(full_coco_image_path)
         all_captions.append(caption)
 
-
     train_captions, img_name_vector = shuffle(all_captions,
                                               all_img_name_vector,
                                               random_state=1)
 
 
-    train_captions = train_captions[:num_examples]
     if not full_coco_dataset:
+        train_captions = train_captions[:num_examples]
         img_name_vector = img_name_vector[:num_examples]
+
 
 
     #
@@ -128,10 +128,11 @@ def process_images(img_name_vector):
     total = len(encode_train)
     for img, path in image_dataset:
       batch_features = image_features_extract_model(img)
+      print('Before shape: ', batch_features.shape)
       if not generate_dict_dataset:
         batch_features = tf.reshape(batch_features,
                                   (batch_features.shape[0], -1, batch_features.shape[-1]))
-      print(batch_features.shape)
+      print('After shape: ', batch_features.shape)
 
       for bf, p in zip(batch_features, path):
         path_of_feature = os.path.join(save_features_path, os.path.split(p.numpy().decode("utf-8"))[-1])
@@ -152,6 +153,7 @@ def main():
         import sys
         sys.exit(-1)
 
+    print('Processing: ', len(img_name_vector))
     process_images(img_name_vector)
     print('Finished processing images.')
 

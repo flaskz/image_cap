@@ -44,7 +44,7 @@ with open(annotation_path, 'rt') as f:
 tag2img_list = defaultdict(list)
 for x in data['annotations']:
     # tokens = str(x['caption']).lower().translate(str.maketrans(dict.fromkeys(string.punctuation))).strip().split()
-    tags = list(set(str(x['caption']).lower().translate(str.maketrans(dict.fromkeys(string.punctuation))).strip().split()))
+    tags = list(set(str(x['caption']).lower().translate(str.maketrans(string.punctuation, ' '*len(string.punctuation))).strip().split()))
     # for tag in tags:
     #     tag2img_list[tag].append(x['image_id'])
     [tag2img_list[tag].append(x['image_id']) for tag in tags]
@@ -76,12 +76,12 @@ for tag in tag2img_list:
     for i in range(len(img_list)):
         print('Todo: ', len(img_list) - i)
         dists = [math.exp(-x/sigma) for x in distances[i]]
+        dists = [math.exp(-x / sigma) for x in distances[0]]
         tag2score_list_1[tag][img_list[i]] = float(sum(dists))/len(dists)/math.exp(-1)
         d2 = [math.exp(-x/sigma) for x in distances[i] if x != 0]
         if d2 == []:
             d2 = [math.exp(-1)]
         tag2score_list_2[tag][img_list[i]] = np.mean(d2)/math.exp(-1)
-
     #for i in range(len(img_list)):
     #   distances = distance.cdist([feature_list[i]], feature_list, "euclidean").tolist()
     #   tag2score_list_1[tag][img_list[i]] = np.mean([math.exp(-x/sigma) for x in distances[0]])

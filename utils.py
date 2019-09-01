@@ -19,7 +19,22 @@ def load_weights(weights_path):
         data = json.load(f)
     return data
 
-data = load_weights('./tag2score_list_2.json')
+
+def create_coco_dict(annotation_file):
+    with open(annotation_file, 'rt') as f:
+        data = json.load(f)
+
+    images_dict = {}
+    for annot in data['annotations']:
+        # break
+        if annot['image_id'] not in images_dict.keys():
+            images_dict[annot['image_id']] = []
+        images_dict[annot['image_id']].append(annot['caption'])
+
+    return images_dict
+
+
+# data = load_weights('./tag2score_list_2.json')
 
 ################
 

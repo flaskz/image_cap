@@ -31,9 +31,16 @@ from params import *
 from dl_classes import *
 from utils import create_flickr_dict, load_weights
 
-word_weight = load_weights('./tag2score_list_2.json')
+word_weight = load_weights('flickr_vgg_json/tag2score_list_2.json')
 num_examples = int(num_batches * BATCH_SIZE / (1-TEST_SIZE))
 loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
+
+# a = str(int('inception/COCO_train2014_000000124567.jpg.npy'.split('.')[0].split('_')[-1]))
+# r = []
+# for k, v in word_weight.items():
+#     if a in list(v.keys()):
+#         print('achou')
+#         r.append(k)
 
 def create_data_coco():
     all_captions = []
@@ -129,10 +136,17 @@ def map_func(img_name, cap):
     load_path = os.path.join(save_features_path, os.path.split(img_name.decode('utf-8') + '.npy')[-1])
     # print('load path:', load_path)
     img_tensor = np.load(load_path)
-    return img_tensor, cap
+    # print('img name: ', str(os.path.split(img_name)[-1]).split('.'))
+    # print('path img id: ', str(os.path.split(img_name)[-1]).split('.')[0].split('_')[-1])
+    if data_format == 'coco':
+        imgs_ids = str(int(os.path.split(img_name)[-1].decode('utf8').split('.')[0].split('_')[-1]))
+    else:
+        imgs_ids = os.path.split(img_name)[-1].decode('utf8').split('.')[0]
+
+    return img_tensor, cap, imgs_ids
 
 
-def loss_function(real, pred):
+def loss_function(real, pred, weights_):
     # print('real: ', real)
     # print('pred: ', pred)
     mask = tf.math.logical_not(tf.math.equal(real, 0))
@@ -141,40 +155,66 @@ def loss_function(real, pred):
     mask = tf.cast(mask, dtype=loss_.dtype)
     loss_ *= mask
 
+    weights_loss_ = np.multiply(loss_, weights_)
+
     # print('loss: ', loss_)
     # print('half loss: ', loss_*tf.cast(0.5, dtype=loss_.dtype))
     # print('reduce mean: ', tf.reduce_mean(loss_))
+    # return tf.reduce_mean(weights_loss_)
     return tf.reduce_mean(loss_)
 
-
-@tf.function
-def train_step(img_tensor, target, encoder, decoder, tokenizer, optimizer):
+wrong_words = set()
+# @tf.function
+def train_step(img_tensor, target, encoder, decoder, tokenizer, optimizer, img_names):
     loss = 0
     hidden = decoder.reset_state(batch_size=target.shape[0])
-    print('tensor shape:', img_tensor.shape)
+    # print('tensor shape:', img_tensor.shape)
+
+    # for x in target[:1]:
+    #     my_r = []
+    #     for y in x:
+    #         my_r.append(tokenizer.index_word[np.int(y)])
+    #     print('True cap: ', ' '.join(my_r))
 
     dec_input = tf.expand_dims([tokenizer.word_index['<start>']] * BATCH_SIZE, 1)
 
     with tf.GradientTape() as tape:
         features = encoder(img_tensor)
-        print('feats shape: ', features.shape)
+        # print('feats shape: ', features.shape)
 
+        # my_p = []
         for i in range(1, target.shape[1]):
             # print('features shape,', features.shape)
             predictions, hidden, _ = decoder(dec_input, features, hidden)
 
-            # print('pred 0:', tf.argmax(predictions[0]).numpy())
+            # print('pred 0:', tf.argmax(predictions[7]).numpy())
+            # my_p.append(tokenizer.index_word[tf.argmax(predictions[7]).numpy()])
 
-            # for new_i in range(BATCH_SIZE):
-            #     true_id = np.array(target[:, i])
-            #     # print('true word: ', tokenizer.index_word[true_id])
-            #     print('true word: ', tokenizer.index_word[true_id[new_i]])
-            #     predicted_id = tf.argmax(predictions[new_i]).numpy()
-            #     print('pred word: ', tokenizer.index_word[predicted_id])
+            weights_each = []
+            for new_i in range(BATCH_SIZE):
+                true_id = np.array(target[:, i])
+                true_word = tokenizer.index_word[true_id[new_i]]
 
-            loss += loss_function(target[:, i], predictions)
+                # print('true word: ', tokenizer.index_word[true_id])
+                # print('true word: ', true_word)
+                # predicted_id = tf.argmax(predictions[new_i]).numpy()
+                # pred_word = tokenizer.index_word[predicted_id[new_i]]
+                # print('pred word: ', tokenizer.index_word[predicted_id])
+                try:
+                    if data_format == 'coco':
+                        weights_each.append(word_weight[true_word][str(np.int(img_names[new_i]))])
+                    else:
+                        weights_each.append(word_weight[true_word][img_names[new_i].numpy().decode('utf8')])
+                except Exception as e:
+                    # if true_word not in wrong_words:
+                    #     wrong_words.add(true_word)
+                    #     print(wrong_words)
+                    weights_each.append(1)
+            np_weights_words = np.array(weights_each)
+
+            loss += loss_function(target[:, i], predictions, np_weights_words)
             dec_input = tf.expand_dims(target[:, i], 1)
-
+        # print('Pred cap: ', ' '.join(my_p))
     total_loss = (loss / int(target.shape[1]))
 
     trainable_variables = encoder.trainable_variables + decoder.trainable_variables
@@ -189,21 +229,29 @@ def train_step(img_tensor, target, encoder, decoder, tokenizer, optimizer):
 def create_architecture(img_name_train, cap_train, tokenizer):
     if vgg:
         print('Using vgg.')
-        # image_model = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet', input_shape=(224, 224, 3))
-        image_model = tf.keras.applications.vgg16.VGG16(include_top=True, weights='imagenet', input_shape=(224, 224, 3))
+        if generate_dict_dataset:
+            image_model = tf.keras.applications.vgg16.VGG16(include_top=True, weights='imagenet',
+                                                            input_shape=(224, 224, 3))
+        else:
+            image_model = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet',
+                                                            input_shape=(224, 224, 3))
     else:
         print('Using Inception V3.')
-        # image_model = tf.keras.applications.InceptionV3(include_top=False, weights='imagenet', input_shape=(299, 299, 3))
-        image_model = tf.keras.applications.InceptionV3(include_top=True, weights='imagenet', input_shape=(299, 299, 3))
-
-
-    # image_model.summary()
+        if generate_dict_dataset:
+            image_model = tf.keras.applications.InceptionV3(include_top=True, weights='imagenet',
+                                                            input_shape=(299, 299, 3))
+        else:
+            image_model = tf.keras.applications.InceptionV3(include_top=False, weights='imagenet',
+                                                            input_shape=(299, 299, 3))
 
     new_input = image_model.input
-    # hidden_layer = image_model.layers[-1].output
-    # num_feats = int(np.multiply(*hidden_layer.shape[1:3]))
 
-    hidden_layer = image_model.layers[-2].output
+    if generate_dict_dataset:
+        hidden_layer = image_model.layers[-2].output
+    else:
+        hidden_layer = image_model.layers[-1].output
+
+    # hidden_layer = image_model.layers[-2].output
     num_feats = 64
 
     BUFFER_SIZE = 1000
@@ -219,7 +267,7 @@ def create_architecture(img_name_train, cap_train, tokenizer):
     dataset = tf.data.Dataset.from_tensor_slices((img_name_train, cap_train))
 
     dataset = dataset.map(lambda item1, item2: tf.numpy_function(
-              map_func, [item1, item2], [tf.float32, tf.int32]),
+              map_func, [item1, item2], [tf.float32, tf.int32, tf.string]),
               num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     dataset = dataset.shuffle(BUFFER_SIZE).batch(BATCH_SIZE)
@@ -249,9 +297,11 @@ def start_training(dataset, encoder, decoder, optimizer, tokenizer, num_steps, c
         start = time.time()
         total_loss = 0
 
-        for (batch, (img_tensor, target)) in enumerate(dataset):
-            # print(img_tensor.shape)
-            batch_loss, t_loss = train_step(img_tensor, target, encoder, decoder, tokenizer, optimizer)
+        for (batch, (img_tensor, target, img_names)) in enumerate(dataset):
+            # print('tensor shape: ', img_tensor.shape)
+            # print('target shape: ', target.shape)
+            # print('img name: ', img_names)
+            batch_loss, t_loss = train_step(img_tensor, target, encoder, decoder, tokenizer, optimizer, img_names)
             total_loss += t_loss
 
             if batch % 100 == 0:
@@ -295,6 +345,15 @@ def main():
     else:
         print('Works only with flickr or coco data.')
         sys.exit(-1)
+
+
+    # r = []
+    # for x in cap_train[0]:
+    #     r.append(tokenizer.index_word[x])
+    # print(' '.join(r))
+    # img_id = [x['id'] for x in annotations['images'] if x['file_name']==os.path.split(img_name_train[0])[-1]]
+    # my_r = [x for x in annotations['annotations'] if x['image_id']==img_id[0]]
+    #
 
     with open(os.path.join(checkpoint_save_path, 'tokenizer.pickle'), 'wb') as handle:
         pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
