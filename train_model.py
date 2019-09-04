@@ -18,6 +18,7 @@ import matplotlib.image as mpimg
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 
+import string
 import pickle
 import re
 import numpy as np
@@ -31,7 +32,7 @@ from params import *
 from dl_classes import *
 from utils import create_flickr_dict, load_weights
 
-word_weight = load_weights('flickr_vgg_json/tag2score_list_2.json')
+word_weight = load_weights('coco_incept_json/tag2score_list_2.json')
 num_examples = int(num_batches * BATCH_SIZE / (1-TEST_SIZE))
 loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 
@@ -110,7 +111,8 @@ def calc_max_length(tensor):
 def create_training_data(img_name_vector, train_captions, top_k=5000, rs=0):
     tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=top_k,
                                                       oov_token="<unk>",
-                                                      filters='!"#$%&()*+.,-/:;=?@[\\]^_`{|}~ ')
+                                                      # filters='!"#$%&()*+.,-/:;=?@[\\]^_`{|}~ ')
+                                                      filters=string.punctuation)
 
     tokenizer.fit_on_texts(train_captions)
     train_seqs = tokenizer.texts_to_sequences(train_captions)
@@ -164,7 +166,7 @@ def loss_function(real, pred, weights_):
     return tf.reduce_mean(loss_)
 
 wrong_words = set()
-# @tf.function
+@tf.function
 def train_step(img_tensor, target, encoder, decoder, tokenizer, optimizer, img_names):
     loss = 0
     hidden = decoder.reset_state(batch_size=target.shape[0])
@@ -207,6 +209,7 @@ def train_step(img_tensor, target, encoder, decoder, tokenizer, optimizer, img_n
                         weights_each.append(word_weight[true_word][img_names[new_i].numpy().decode('utf8')])
                 except Exception as e:
                     # if true_word not in wrong_words:
+                    #     print(e)
                     #     wrong_words.add(true_word)
                     #     print(wrong_words)
                     weights_each.append(1)

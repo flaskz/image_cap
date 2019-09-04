@@ -179,8 +179,12 @@ def nearest_caps(image_path):
         imgs_dict = create_flickr_dict(flickr_captions)
 
     all_caps = []
-    for r in results[1][0]:
-        [all_caps.append(x) for x in imgs_dict[imgs_id[r]+'.jpg']]
+    if data_format == 'coco':
+        for r in results[1][0]:
+            [all_caps.append(x) for x in imgs_dict[imgs_id[r]]]
+    else:
+        for r in results[1][0]:
+            [all_caps.append(x) for x in imgs_dict[imgs_id[r]+'.jpg']]
     return all_caps
 
 
