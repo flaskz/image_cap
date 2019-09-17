@@ -32,7 +32,7 @@ from params import *
 from dl_classes import *
 from utils import create_flickr_dict, load_weights
 
-word_weight = load_weights('coco_incept_json/tag2score_list_2.json')
+word_weight = load_weights(weight_path)
 num_examples = int(num_batches * BATCH_SIZE / (1-TEST_SIZE))
 loss_object = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 
@@ -77,7 +77,9 @@ def generate_flickr_dataset():
 
     tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=5000,
                                                       oov_token="<unk>",
+                                                      # filters=string.punctuation)
                                                       filters='!"#$%&()*+.,-/:;=?@[\\]^_`{|}~ ')
+
 
     tokenizer.fit_on_texts(train_captions)
     train_seqs = tokenizer.texts_to_sequences(train_captions)
@@ -111,8 +113,8 @@ def calc_max_length(tensor):
 def create_training_data(img_name_vector, train_captions, top_k=5000, rs=0):
     tokenizer = tf.keras.preprocessing.text.Tokenizer(num_words=top_k,
                                                       oov_token="<unk>",
-                                                      # filters='!"#$%&()*+.,-/:;=?@[\\]^_`{|}~ ')
-                                                      filters=string.punctuation)
+                                                      filters='!"#$%&()*+.,-/:;=?@[\\]^_`{|}~ ')
+                                                      # filters=string.punctuation)
 
     tokenizer.fit_on_texts(train_captions)
     train_seqs = tokenizer.texts_to_sequences(train_captions)
@@ -165,9 +167,9 @@ def loss_function(real, pred, weights_):
     # return tf.reduce_mean(weights_loss_)
     return tf.reduce_mean(loss_)
 
-wrong_words = set()
-@tf.function
-def train_step(img_tensor, target, encoder, decoder, tokenizer, optimizer, img_names):
+# wrong_words = set()
+# @tf.function
+def train_step_euclidean(img_tensor, target, encoder, decoder, tokenizer, optimizer, img_names):
     loss = 0
     hidden = decoder.reset_state(batch_size=target.shape[0])
     # print('tensor shape:', img_tensor.shape)
@@ -229,30 +231,90 @@ def train_step(img_tensor, target, encoder, decoder, tokenizer, optimizer, img_n
     return loss, total_loss
 
 
+# @tf.function
+def train_step_pos(img_tensor, target, encoder, decoder, tokenizer, optimizer):
+    loss = 0
+    hidden = decoder.reset_state(batch_size=target.shape[0])
+    # print('tensor shape:', img_tensor.shape)
+
+    # for x in target[:1]:
+    #     my_r = []
+    #     for y in x:
+    #         my_r.append(tokenizer.index_word[np.int(y)])
+    #     print('True cap: ', ' '.join(my_r))
+
+    dec_input = tf.expand_dims([tokenizer.word_index['<start>']] * BATCH_SIZE, 1)
+
+    with tf.GradientTape() as tape:
+        features = encoder(img_tensor)
+        # print('feats shape: ', features.shape)
+
+        # my_p = []
+        for i in range(1, target.shape[1]):
+            # print('features shape,', features.shape)
+            predictions, hidden, _ = decoder(dec_input, features, hidden)
+
+            # print('pred 0:', tf.argmax(predictions[7]).numpy())
+            # my_p.append(tokenizer.index_word[tf.argmax(predictions[7]).numpy()])
+
+            weights_each = []
+            for new_i in range(BATCH_SIZE):
+                true_id = np.array(target[:, i])
+                true_word = tokenizer.index_word[true_id[new_i]]
+
+                # print('true word: ', tokenizer.index_word[true_id])
+                # print('true word: ', true_word)
+                # predicted_id = tf.argmax(predictions[new_i]).numpy()
+                # pred_word = tokenizer.index_word[predicted_id[new_i]]
+                # print('pred word: ', tokenizer.index_word[predicted_id])
+                try:
+                    weights_each.append(word_weight[true_word])
+                except Exception as e:
+                    # if true_word not in wrong_words:
+                    #     print(e)
+                    #     wrong_words.add(true_word)
+                    #     print(wrong_words)
+                    weights_each.append(1)
+            np_weights_words = np.array(weights_each)
+
+            loss += loss_function(target[:, i], predictions, np_weights_words)
+            dec_input = tf.expand_dims(target[:, i], 1)
+        # print('Pred cap: ', ' '.join(my_p))
+    total_loss = (loss / int(target.shape[1]))
+
+    trainable_variables = encoder.trainable_variables + decoder.trainable_variables
+
+    gradients = tape.gradient(loss, trainable_variables)
+
+    optimizer.apply_gradients(zip(gradients, trainable_variables))
+
+    return loss, total_loss
+
+
 def create_architecture(img_name_train, cap_train, tokenizer):
     if vgg:
         print('Using vgg.')
-        if generate_dict_dataset:
-            image_model = tf.keras.applications.vgg16.VGG16(include_top=True, weights='imagenet',
-                                                            input_shape=(224, 224, 3))
-        else:
-            image_model = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet',
+        # if generate_dict_dataset:
+        #     image_model = tf.keras.applications.vgg16.VGG16(include_top=True, weights='imagenet',
+        #                                                     input_shape=(224, 224, 3))
+        # else:
+        image_model = tf.keras.applications.vgg16.VGG16(include_top=False, weights='imagenet',
                                                             input_shape=(224, 224, 3))
     else:
         print('Using Inception V3.')
-        if generate_dict_dataset:
-            image_model = tf.keras.applications.InceptionV3(include_top=True, weights='imagenet',
-                                                            input_shape=(299, 299, 3))
-        else:
-            image_model = tf.keras.applications.InceptionV3(include_top=False, weights='imagenet',
+        # if generate_dict_dataset:
+        #     image_model = tf.keras.applications.InceptionV3(include_top=True, weights='imagenet',
+        #                                                     input_shape=(299, 299, 3))
+        # else:
+        image_model = tf.keras.applications.InceptionV3(include_top=False, weights='imagenet',
                                                             input_shape=(299, 299, 3))
 
     new_input = image_model.input
 
-    if generate_dict_dataset:
-        hidden_layer = image_model.layers[-2].output
-    else:
-        hidden_layer = image_model.layers[-1].output
+    # if generate_dict_dataset:
+    #     hidden_layer = image_model.layers[-2].output
+    # else:
+    hidden_layer = image_model.layers[-1].output
 
     # hidden_layer = image_model.layers[-2].output
     num_feats = 64
@@ -285,7 +347,7 @@ def create_architecture(img_name_train, cap_train, tokenizer):
     return dataset, encoder, decoder, optimizer, num_steps
 
 
-def start_training(dataset, encoder, decoder, optimizer, tokenizer, num_steps, checkpoint_path=".\\checkpoints\\incept3"):
+def start_training_euclidean(dataset, encoder, decoder, optimizer, tokenizer, num_steps, checkpoint_path=".\\checkpoints\\incept3"):
     loss_plot = []
     ckpt = tf.train.Checkpoint(encoder=encoder,
                                decoder=decoder,
@@ -304,7 +366,54 @@ def start_training(dataset, encoder, decoder, optimizer, tokenizer, num_steps, c
             # print('tensor shape: ', img_tensor.shape)
             # print('target shape: ', target.shape)
             # print('img name: ', img_names)
-            batch_loss, t_loss = train_step(img_tensor, target, encoder, decoder, tokenizer, optimizer, img_names)
+            batch_loss, t_loss = train_step_euclidean(img_tensor, target, encoder, decoder, tokenizer, optimizer, img_names)
+            total_loss += t_loss
+
+            if batch % 100 == 0:
+                print ('Epoch {} Batch {} Loss {:.4f}'.format(
+                  epoch + 1, batch, batch_loss.numpy() / int(target.shape[1])))
+        # storing the epoch end loss value to plot later
+        loss_plot.append(total_loss / num_steps)
+
+        if (epoch+1) % 5 == 0:
+          print('Saving checkpoint.')
+          ckpt_manager.save()
+
+        print('Epoch {} Loss {:.6f}'.format(epoch + 1,
+                                             total_loss/num_steps))
+        print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
+
+    print('Saving checkpoint.')
+    ckpt_manager.save()
+
+    plt.plot(loss_plot)
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.title('Loss Plot')
+    plt.show()
+
+
+
+def start_training_pos(dataset, encoder, decoder, optimizer, tokenizer, num_steps, checkpoint_path=".\\checkpoints\\incept3"):
+    loss_plot = []
+    ckpt = tf.train.Checkpoint(encoder=encoder,
+                               decoder=decoder,
+                               optimizer=optimizer)
+
+    ckpt_manager = tf.train.CheckpointManager(ckpt, checkpoint_path, max_to_keep=5)
+    start_epoch = 0
+    # if ckpt_manager.latest_checkpoint:
+    #   start_epoch = int(ckpt_manager.latest_checkpoint.split('-')[-1])
+
+    for epoch in range(start_epoch, EPOCHS):
+        start = time.time()
+        total_loss = 0
+
+        for (batch, (img_tensor, target, img_names)) in enumerate(dataset):
+            # print('tensor shape: ', img_tensor.shape)
+            # print('target shape: ', target.shape)
+            # print('img name: ', img_names)
+            batch_loss, t_loss = train_step_pos(img_tensor, target, encoder, decoder, tokenizer, optimizer)
             total_loss += t_loss
 
             if batch % 100 == 0:
@@ -365,13 +474,22 @@ def main():
     print('Creating architecture.')
     dataset, encoder, decoder, optimizer, num_steps = create_architecture(img_name_train, cap_train, tokenizer)
     print('Starting training.')
-    start_training(dataset=dataset,
-                   encoder=encoder,
-                   decoder=decoder,
-                   optimizer=optimizer,
-                   tokenizer=tokenizer,
-                   num_steps=num_steps,
-                   checkpoint_path=checkpoint_save_path)
+    if weight_type == 'pos':
+        start_training_pos(dataset=dataset,
+                       encoder=encoder,
+                       decoder=decoder,
+                       optimizer=optimizer,
+                       tokenizer=tokenizer,
+                       num_steps=num_steps,
+                       checkpoint_path=checkpoint_save_path)
+    else:
+        start_training_euclidean(dataset=dataset,
+                           encoder=encoder,
+                           decoder=decoder,
+                           optimizer=optimizer,
+                           tokenizer=tokenizer,
+                           num_steps=num_steps,
+                           checkpoint_path=checkpoint_save_path)
     print('Finished training.')
     # print('Saving model.')
     #

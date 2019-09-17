@@ -7,7 +7,8 @@ from scipy.spatial import distance
 # import cPickle as pkl
 # import pdb
 import math
-from params import save_features_path, data_format, vgg
+
+from params import save_features_path, data_format, vgg, weights_dir
 
 # img_featuer_path = "/home/zhaoxin/chenminghai/mRNN-CR/image_features_mRNN/VGG_feat_mRNN_refine_dct_mscoco_2014.npy"
 # annotation_path = '/home/zhaoxin/chenminghai/data/coco/annotations/captions_split_train2014.json'
@@ -44,7 +45,8 @@ with open(annotation_path, 'rt') as f:
 tag2img_list = defaultdict(list)
 for x in data['annotations']:
     # tokens = str(x['caption']).lower().translate(str.maketrans(dict.fromkeys(string.punctuation))).strip().split()
-    tags = list(set(str(x['caption']).lower().translate(str.maketrans(string.punctuation, ' '*len(string.punctuation))).strip().split()))
+    # tags = list(set(str(x['caption']).lower().translate(str.maketrans(string.punctuation, ' '*len(string.punctuation))).strip().split()))
+    tags = list(set(str(x['caption']).lower().translate(str.maketrans('!"#$%&()*+.,-/:;=?@[\\]^_`{|}~ ', ' '*len('!"#$%&()*+.,-/:;=?@[\\]^_`{|}~ '))).strip().split()))
     # for tag in tags:
     #     tag2img_list[tag].append(x['image_id'])
     [tag2img_list[tag].append(x['image_id']) for tag in tags]
@@ -55,6 +57,7 @@ for x in tag2img_list:
 tag2score_list_1 = {}
 tag2score_list_2 = {}
 num = 0
+
 for tag in tag2img_list:
     num += 1
     img_list = tag2img_list[tag]
@@ -92,16 +95,17 @@ for tag in tag2img_list:
 
     if num % 1000 == 0:
         print('Saving json.')
-        with open('tag2score_list_1.json', 'wt') as f:
+        with open(os.path.join(weights_dir, 'tag2score_list_1.json'), 'wt') as f:
             json.dump(tag2score_list_1, f)
-        with open('tag2score_list_2.json', 'wt') as f:
+        with open(os.path.join(weights_dir, 'tag2score_list_2.json'), 'wt') as f:
             json.dump(tag2score_list_2, f)
 
 # pdb.set_trace()
-with open('tag2score_list_1.json', 'wt') as f:
+
+with open(os.path.join(weights_dir, 'tag2score_list_1.json'), 'wt') as f:
     json.dump(tag2score_list_1, f)
 
-with open('tag2score_list_2.json', 'wt') as f:
+with open(os.path.join(weights_dir, 'tag2score_list_2.json'), 'wt') as f:
     json.dump(tag2score_list_2, f)
 
 

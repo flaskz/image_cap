@@ -1,5 +1,6 @@
 import json
 
+
 def create_flickr_dict(flickr_captions):
     images_dict = {}
     with open(flickr_captions, 'rt') as f:

@@ -2,7 +2,7 @@ import os
 
 # using softmax layer, the same from neuraltalk
 # use to generate weights from dict dataset
-generate_dict_dataset = True
+generate_dict_dataset = False
 
 # coco data only
 full_coco_dataset = False
@@ -17,10 +17,10 @@ EPOCHS = 10
 
 # cnn architecture (vgg/inception)
 # if vgg = False then use inception
-vgg = True
+vgg = False
 
 # which dataset to use (coco/flickr)
-data_format = 'flickr'
+data_format = 'coco'
 
 # path for saved features
 if generate_dict_dataset:
@@ -29,6 +29,14 @@ else:
     save_features_path = 'E:\\User\\freelancer\\features\\{}\\{}\\'.format(data_format, 'vgg' if vgg else 'inception')
 
 os.makedirs(save_features_path, exist_ok=True)
+
+weights_dir = './weights_json'
+os.makedirs(weights_dir, exist_ok=True)
+
+# type of weight (pos/euclidean)
+weight_type = 'pos'
+# path to weight file
+weight_path = os.path.join(weights_dir, 'tag2score_pos_weight.json') if weight_type == 'pos' else os.path.join(weights_dir, 'tag2score_list_2.json')
 
 # path to coco train annotation file
 annotation_file = 'E:\\User\\freelancer\\image_captioning\\annotations\\captions_train2014.json'
