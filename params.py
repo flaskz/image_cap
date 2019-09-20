@@ -22,6 +22,10 @@ vgg = False
 # which dataset to use (coco/flickr)
 data_format = 'coco'
 
+# BEAM SEARCH PARAMS
+num_k_beam = 5
+alpha = 0.7
+
 # path for saved features
 if generate_dict_dataset:
     save_features_path = 'E:\\User\\freelancer\\features\\include_top\\{}\\{}\\'.format(data_format, 'vgg' if vgg else 'inception')
@@ -73,8 +77,9 @@ os.makedirs(checkpoint_save_path, exist_ok=True)
 # directory with the saved model for validation
 # checkpoint_load_path = checkpoint_save_path
 if data_format == 'coco':
+    checkpoint_load_path = ".\\checkpoints\\train"
     # checkpoint_load_path = ".\\checkpoints\\test_coco_train"
-    checkpoint_load_path = checkpoint_save_path
+    # checkpoint_load_path = checkpoint_save_path
 else:
     # checkpoint_load_path = ".\\checkpoints\\test_flickr_train"
     checkpoint_load_path = checkpoint_save_path
@@ -85,7 +90,7 @@ validate_batch = False
 
 # single_image_val = 'E:\\User\\freelancer\\datasets\\Flickr8k\\1579798212_d30844b4c5.jpg']
 # single_image_val = 'E:\\User\\Imagem\\formacao_1600x1200-um-milhao-de-amigos.jpg'
-single_image_val = 'E:\\User\\Imagem\\Helping-the-elderly.jpg'
+single_image_val = 'E:\\User\\Imagem\\foto1.jpg'
 
 
 validation_dir = 'E:\\User\\freelancer\\datasets\\train2014'

@@ -16,6 +16,7 @@ import matplotlib.image as mpimg
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 
+import cv2
 import sys
 import pickle
 import re
@@ -52,10 +53,10 @@ def create_val_json(imgs_caps, file_name):
 
 
 def load_image(image_path):
-    print('load image: ', image_path)
+    # print('load image: ', image_path)
     img = tf.io.read_file(image_path)
     img = tf.image.decode_jpeg(img, channels=3)
-    print('loaded image: ', img.shape)
+    # print('loaded image: ', img.shape)
     if vgg:
         print('vgg')
         img = tf.image.resize(img, (224, 224))
@@ -64,18 +65,18 @@ def load_image(image_path):
         print('inception')
         img = tf.image.resize(img, (299, 299))
         new_img = tf.keras.applications.inception_v3.preprocess_input(img)
-    print('processed: ', new_img.shape, img.shape)
+    # print('processed: ', new_img.shape, img.shape)
 
     return new_img, image_path
 
 
-def evaluate(image):
+def without_beam_evaluate(image):
     hidden = decoder.reset_state(batch_size=1)
     temp_input = tf.expand_dims(load_image(image)[0], 0)
     img_tensor_val = image_features_extract_model(temp_input)
 
     img_tensor_val = tf.reshape(img_tensor_val, (img_tensor_val.shape[0], -1, img_tensor_val.shape[-1]))
-    print('img shape: ', img_tensor_val.shape)
+    # print('img shape: ', img_tensor_val.shape)
 
     # print('here?')
     features = encoder(img_tensor_val)
@@ -83,12 +84,16 @@ def evaluate(image):
     dec_input = tf.expand_dims([tokenizer.word_index['<start>']], 0)
     result = []
 
+    all_probs = []
+
     for i in range(max_length):
 
         predictions, hidden, attention_weights = decoder(dec_input, features, hidden)
 
         predicted_id = tf.argmax(predictions[0]).numpy()
         result.append(tokenizer.index_word[predicted_id])
+        pred_probs, predicted_ids = tf.math.top_k(predictions[0], k=15)
+        all_probs.append(pred_probs)
 
         if tokenizer.index_word[predicted_id] == '<end>':
             # to_return = ' '.join(result)
@@ -98,10 +103,71 @@ def evaluate(image):
 
         dec_input = tf.expand_dims([predicted_id], 0)
 
-    # to_return = ' '.join(result)
-    # print(to_return)
-    # return to_return
     return result
+
+
+def evaluate(image):
+    hidden = decoder.reset_state(batch_size=1)
+    temp_input = tf.expand_dims(load_image(image)[0], 0)
+    img_tensor_val = image_features_extract_model(temp_input)
+
+    img_tensor_val = tf.reshape(img_tensor_val, (img_tensor_val.shape[0], -1, img_tensor_val.shape[-1]))
+    # print('img shape: ', img_tensor_val.shape)
+
+    # print('here?')
+    features = encoder(img_tensor_val)
+    # print("feats shape: ", features.shape)
+
+    # dec_input = tf.expand_dims([tokenizer.word_index['<start>']], 0)
+    # result = []
+
+
+    dec_input = tokenizer.word_index['<start>']
+    res_captions = {k:{'caption': [dec_input], 'score': 0} for k in range(5)}
+    all_captions = []
+
+    completed_sentence = []
+
+    for i in range(max_length):
+        all_candidates = []
+        for img_n in range(num_k_beam):
+            prev_id = res_captions[img_n]['caption'][-1]
+            current_score = res_captions[img_n]['score']
+
+            text = [tokenizer.index_word[x] for x in res_captions[img_n]['caption']]
+
+            dec_input = tf.expand_dims([prev_id], 0)
+
+            predictions, hidden, attention_weights = decoder(dec_input, features, hidden)
+            # norm_preds = tf.sigmoid(predictions[0])
+
+            # predicted_id = tf.argmax(predictions[0]).numpy()
+            # result.append(tokenizer.index_word[predicted_id])
+
+            pred_probs, predicted_ids = tf.math.top_k(predictions[0], k=num_k_beam)
+            percent_pred_probs = [np.negative(np.log(x/100)) if x > 0 else np.inf for x in pred_probs]
+
+
+
+            for pred_id, pred_prob in zip(predicted_ids.numpy(),  percent_pred_probs):
+                this_score = pred_prob+current_score
+                all_ids = res_captions[img_n]['caption'] + [pred_id]
+                if prev_id == 4:
+                    completed_sentence.append((text, all_ids, np.divide(this_score, np.power(len(all_ids), alpha))))
+                else:
+                    all_candidates.append((text + [tokenizer.index_word[pred_id]], res_captions[img_n]['caption'] + [pred_id], this_score))
+
+
+        all_candidates.sort(key=lambda x: x[-1])
+        best_candidates = all_candidates[:num_k_beam]
+        # print(best_candidates)
+        for img_n in range(num_k_beam):
+            res_captions[img_n]['caption'] = best_candidates[img_n][1]
+            res_captions[img_n]['score'] = best_candidates[img_n][2]
+
+    results = sorted(completed_sentence, key=lambda x: x[2])[:num_k_beam]
+    # print([' '.join(x[0]) for x in results])
+    return results
 
 
 with open(os.path.join(checkpoint_load_path, 'tokenizer.pickle'), 'rb') as handle:
@@ -130,7 +196,7 @@ BUFFER_SIZE = 1000
 embedding_dim = 256
 units = 512
 vocab_size = len(tokenizer.word_index) + 1
-print('vocab size: ', vocab_size)
+# print('vocab size: ', vocab_size)
 
 features_shape = hidden_layer.shape[-1]
 
@@ -147,7 +213,7 @@ ckpt = tf.train.Checkpoint(encoder=encoder,
 
 ckpt_manager = tf.train.CheckpointManager(ckpt, checkpoint_load_path, max_to_keep=5)
 ckpt.restore(ckpt_manager.latest_checkpoint)
-print('loaded from checkpoint: ', checkpoint_load_path)
+# print('loaded from checkpoint: ', checkpoint_load_path)
 
 
 def do_validation(imgs):
@@ -204,7 +270,20 @@ if validate_batch:
 else:
     image_path = os.path.abspath(single_image_val)
     result = evaluate(image_path)
-    print('Prediction Caption:', ' '.join(result))
+    beam_pred = result[0][0][1:]
+    print('Prediction beam search Caption:', ' '.join(beam_pred))
+    wo_beam = without_beam_evaluate(image_path)
+    print('Prediction wo beam Caption:', ' '.join(wo_beam))
     all_caps = nearest_caps(image_path)
     print('All caps:', all_caps)
 
+
+# for img in [x for x in os.listdir('E:\\User\\freelancer\\datasets\\Flickr8k') if x.endswith('.jpg')][:10]:
+#     image_path = os.path.abspath(os.path.join('E:\\User\\freelancer\\datasets\\Flickr8k', img))
+#     result = evaluate(image_path)
+#     print('Prediction Caption:', ' '.join(result))
+#     wo_beam = without_beam_evaluate(image_path)
+#     print('Prediction wo beam Caption:', ' '.join(wo_beam))
+#     img_to_show = cv2.imread(image_path, cv2.IMREAD_COLOR)
+#     cv2.imshow('img', img_to_show)
+#     cv2.waitKey(1)
