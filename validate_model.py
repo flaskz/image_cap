@@ -26,6 +26,8 @@ import json
 from glob import glob
 from PIL import Image
 
+import nltk
+nltk.download('wordnet')
 
 from utils import create_flickr_dict, create_coco_dict
 from params import *
@@ -58,11 +60,11 @@ def load_image(image_path):
     img = tf.image.decode_jpeg(img, channels=3)
     # print('loaded image: ', img.shape)
     if vgg:
-        print('vgg')
+        # print('vgg')
         img = tf.image.resize(img, (224, 224))
         new_img = tf.keras.applications.vgg16.preprocess_input(img, data_format='channels_last')
     else:
-        print('inception')
+        # print('inception')
         img = tf.image.resize(img, (299, 299))
         new_img = tf.keras.applications.inception_v3.preprocess_input(img)
     # print('processed: ', new_img.shape, img.shape)
@@ -270,12 +272,25 @@ if validate_batch:
 else:
     image_path = os.path.abspath(single_image_val)
     result = evaluate(image_path)
-    beam_pred = result[0][0][1:]
-    print('Prediction beam search Caption:', ' '.join(beam_pred))
-    wo_beam = without_beam_evaluate(image_path)
-    print('Prediction wo beam Caption:', ' '.join(wo_beam))
+    beam_pred = result[0][0][1:-1]
+    beam_text_result = ' '.join(beam_pred)
+    print('Prediction beam search Caption:', beam_text_result)
+    # wo_beam = without_beam_evaluate(image_path)
+    # print('Prediction wo beam Caption:', ' '.join(wo_beam))
     all_caps = nearest_caps(image_path)
-    print('All caps:', all_caps)
+    # print('All caps:', all_caps)
+
+    all_scores = []
+    for knn_caption in all_caps:
+        all_scores.append((knn_caption, nltk.meteor([beam_text_result], knn_caption)))
+    all_scores.sort(key=lambda x: x[1])
+    best_knn = all_scores[-1]
+    print('Best knn result based on meteor:', best_knn[0])
+
+    print('GRU meteor score: ', nltk.meteor([human_caption], beam_text_result))
+    print('KNN meteor score: ', nltk.meteor([human_caption], best_knn[0]))
+
+
 
 
 # for img in [x for x in os.listdir('E:\\User\\freelancer\\datasets\\Flickr8k') if x.endswith('.jpg')][:10]:

@@ -2,7 +2,7 @@ import os
 
 # using softmax layer, the same from neuraltalk
 # use to generate weights from dict dataset
-generate_dict_dataset = False
+generate_dict_dataset = True
 
 # coco data only
 full_coco_dataset = False
@@ -20,7 +20,7 @@ EPOCHS = 10
 vgg = False
 
 # which dataset to use (coco/flickr)
-data_format = 'coco'
+data_format = 'flickr'
 
 # BEAM SEARCH PARAMS
 num_k_beam = 5
@@ -81,8 +81,9 @@ if data_format == 'coco':
     # checkpoint_load_path = ".\\checkpoints\\test_coco_train"
     # checkpoint_load_path = checkpoint_save_path
 else:
+    checkpoint_load_path = ".\\checkpoints\\train"
     # checkpoint_load_path = ".\\checkpoints\\test_flickr_train"
-    checkpoint_load_path = checkpoint_save_path
+    # checkpoint_load_path = checkpoint_save_path
 
 # use trained model on single image
 # single_image_val = os.path.join(PATH, 'COCO_train2014_000000093496.jpg')
@@ -95,4 +96,6 @@ single_image_val = 'E:\\User\\Imagem\\foto1.jpg'
 
 validation_dir = 'E:\\User\\freelancer\\datasets\\train2014'
 
+
+human_caption = 'a group of friends meeting at a cafe.'
 

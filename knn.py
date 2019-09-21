@@ -17,9 +17,10 @@ def create_knn_model():
     # features_array = np.array(list(features_dict.values()))
     features_array = []
     imgs_id = []
+
     for k, v in features_dict.items():
         imgs_id.append(k)
-        features_array.append(np.array(v))
+        features_array.append(v)
 
     knn = NearestNeighbors(n_neighbors=1)
     knn.fit(features_array)

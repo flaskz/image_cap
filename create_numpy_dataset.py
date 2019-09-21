@@ -5,7 +5,7 @@ from params import *
 from utils import create_flickr_dict
 
 def get_data_npy():
-    all_npy = [x for x in os.listdir(save_features_path) if x.endswith('.npy')]
+    all_npy = [x for x in os.listdir(save_features_path) if x.endswith('.npy') and x != 'all_npy_dict.npy']
 
     total = len(all_npy)
     i = 0
